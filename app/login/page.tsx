@@ -111,7 +111,7 @@ export default function Login() {
             ) : (
               <Github className="h-4 w-4" />
             )}
-            使用 GitHub 登录
+            使用 GitHub 登录 (需要获取邮箱权限)
           </Button>
 
           <div className="relative">
