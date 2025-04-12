@@ -1,8 +1,8 @@
 "use client"
 
-import React from "react"
+import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -15,61 +15,102 @@ import { useToast } from "@/hooks/use-toast"
 import { getSupabaseClient } from "@/lib/supabase/client"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RichTextEditor } from "@/components/rich-text-editor"
-import type { Category } from "@/types"
+import type { Post, Category } from "@/types"
+import { notFound } from "next/navigation"
 
-export default function CreateBlogPost() {
+export default function EditBlogPost({ params }: { params: { id: string } }) {
+  const [post, setPost] = useState<Post | null>(null)
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [excerpt, setExcerpt] = useState("")
   const [published, setPublished] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const [loadingCategories, setLoadingCategories] = useState(true)
 
   const { user } = useAuth()
   const router = useRouter()
   const { toast } = useToast()
   const supabase = getSupabaseClient()
 
-  useState(null)
+  useEffect(() => {
+    if (!user) {
+      router.push("/login")
+      return
+    }
 
-  React.useEffect(() => {
-    const fetchCategories = async () => {
+    const fetchPost = async () => {
       try {
-        const { data, error } = await supabase.from("categories").select("*").order("name", { ascending: true })
+        // 获取文章
+        const { data: postData, error: postError } = await supabase
+          .from("posts")
+          .select("*")
+          .eq("id", params.id)
+          .single()
 
-        if (error) {
-          throw error
+        if (postError) {
+          throw postError
         }
 
-        setCategories(data as Category[])
+        if (postData.author_id !== user.id) {
+          toast({
+            title: "无权限",
+            description: "您没有权限编辑此文章",
+            variant: "destructive",
+          })
+          router.push("/dashboard")
+          return
+        }
+
+        setPost(postData as Post)
+        setTitle(postData.title)
+        setContent(postData.content)
+        setExcerpt(postData.excerpt || "")
+        setPublished(postData.published)
+
+        // 获取分类
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from("categories")
+          .select("*")
+          .order("name", { ascending: true })
+
+        if (categoriesError) {
+          throw categoriesError
+        }
+
+        setCategories(categoriesData as Category[])
+
+        // 获取文章的分类
+        const { data: postCategoriesData, error: postCategoriesError } = await supabase
+          .from("post_categories")
+          .select("category_id")
+          .eq("post_id", params.id)
+
+        if (postCategoriesError) {
+          throw postCategoriesError
+        }
+
+        setSelectedCategories(postCategoriesData.map((pc) => pc.category_id))
       } catch (error: any) {
         toast({
-          title: "获取分类失败",
+          title: "获取文章失败",
           description: error.message || "发生了未知错误，请稍后再试",
           variant: "destructive",
         })
+        router.push("/dashboard")
       } finally {
-        setLoadingCategories(false)
+        setIsLoading(false)
       }
     }
 
-    fetchCategories()
-  }, [toast])
+    fetchPost()
+  }, [params.id, user, router, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    console.log("Current user in create blog:", user)
-
-    if (!user) {
-      toast({
-        title: "未登录",
-        description: "请先登录后再创建文章",
-        variant: "destructive",
-      })
-      router.push("/login")
+    if (!user || !post) {
       return
     }
 
@@ -82,80 +123,64 @@ export default function CreateBlogPost() {
       return
     }
 
-    setIsLoading(true)
+    setIsSubmitting(true)
 
     try {
-      // 确保我们有用户ID
-      if (!user.id) {
-        throw new Error("用户ID不存在")
-      }
-
-      // 生成唯一的 slug
-      const slug =
-        title
-          .toLowerCase()
-          .replace(/\s+/g, "-")
-          .replace(/[^\w-]+/g, "")
-          .replace(/--+/g, "-")
-          .replace(/^-+/, "")
-          .replace(/-+$/, "") +
-        "-" +
-        Date.now().toString().slice(-6)
-
-      // 创建文章
-      const { data, error } = await supabase
+      // 更新文章
+      const { error: updateError } = await supabase
         .from("posts")
-        .insert([
-          {
-            title,
-            content,
-            excerpt: excerpt || null,
-            author_id: user.id,
-            published,
-            slug,
-          },
-        ])
-        .select()
+        .update({
+          title,
+          content,
+          excerpt: excerpt || null,
+          published,
+        })
+        .eq("id", post.id)
 
-      if (error) {
-        throw error
+      if (updateError) {
+        throw updateError
       }
 
-      const postId = data[0].id
+      // 删除现有的分类关联
+      const { error: deleteError } = await supabase.from("post_categories").delete().eq("post_id", post.id)
 
-      // 如果选择了分类，创建文章与分类的关联
+      if (deleteError) {
+        throw deleteError
+      }
+
+      // 如果选择了分类，创建新的分类关联
       if (selectedCategories.length > 0) {
         const categoryRelations = selectedCategories.map((categoryId) => ({
-          post_id: postId,
+          post_id: post.id,
           category_id: categoryId,
         }))
 
-        const { error: relationError } = await supabase.from("post_categories").insert(categoryRelations)
+        const { error: insertError } = await supabase.from("post_categories").insert(categoryRelations)
 
-        if (relationError) {
-          throw relationError
+        if (insertError) {
+          throw insertError
         }
       }
 
       toast({
-        title: "文章创建成功",
-        description: published ? "您的文章已发布" : "您的文章已保存为草稿",
+        title: "文章已更新",
+        description: "您的文章已成功更新",
       })
 
-      // 重定向到新创建的文章页面或仪表板
-      if (published && data && data[0]) {
-        router.push(`/blog/${data[0].slug}`)
+      // 重定向到文章页面或仪表板
+      if (published) {
+        router.push(`/blog/${post.slug}`)
       } else {
         router.push("/dashboard")
       }
     } catch (error: any) {
       toast({
-        title: "创建失败",
+        title: "更新失败",
         description: error.message || "发生了未知错误，请稍后再试",
         variant: "destructive",
       })
     } finally {
-      setIsLoading(false)
+      setIsSubmitting(false)
     }
   }
 
@@ -169,11 +194,25 @@ export default function CreateBlogPost() {
     })
   }
 
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center py-12">
+          <p>加载中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!post) {
+    return notFound()
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Card className="max-w-3xl mx-auto">
         <CardHeader>
-          <CardTitle>创建新文章</CardTitle>
+          <CardTitle>编辑文章</CardTitle>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
@@ -185,7 +224,7 @@ export default function CreateBlogPost() {
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="输入文章标题"
                 required
-                disabled={isLoading}
+                disabled={isSubmitting}
               />
             </div>
 
@@ -197,7 +236,7 @@ export default function CreateBlogPost() {
                 onChange={(e) => setExcerpt(e.target.value)}
                 placeholder="输入文章摘要..."
                 rows={3}
-                disabled={isLoading}
+                disabled={isSubmitting}
               />
             </div>
 
@@ -207,15 +246,13 @@ export default function CreateBlogPost() {
                 content={content}
                 onChange={setContent}
                 placeholder="开始编写文章内容..."
-                disabled={isLoading}
+                disabled={isSubmitting}
               />
             </div>
 
             <div className="space-y-2">
               <Label>分类</Label>
-              {loadingCategories ? (
-                <p className="text-sm text-muted-foreground">加载分类中...</p>
-              ) : categories.length > 0 ? (
+              {categories.length > 0 ? (
                 <div className="grid grid-cols-2 gap-2">
                   {categories.map((category) => (
                     <div key={category.id} className="flex items-center space-x-2">
@@ -223,7 +260,7 @@ export default function CreateBlogPost() {
                         id={`category-${category.id}`}
                         checked={selectedCategories.includes(category.id)}
                         onCheckedChange={() => handleCategoryChange(category.id)}
-                        disabled={isLoading}
+                        disabled={isSubmitting}
                       />
                       <Label htmlFor={`category-${category.id}`} className="cursor-pointer">
                         {category.name}
@@ -241,19 +278,19 @@ export default function CreateBlogPost() {
                 id="published"
                 checked={published}
                 onCheckedChange={(checked) => setPublished(checked as boolean)}
-                disabled={isLoading}
+                disabled={isSubmitting}
               />
-              <Label htmlFor="published">立即发布</Label>
+              <Label htmlFor="published">发布</Label>
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">
-            <Link href="/">
-              <Button variant="outline" disabled={isLoading}>
+            <Link href="/dashboard">
+              <Button variant="outline" disabled={isSubmitting}>
                 取消
               </Button>
             </Link>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "保存中..." : published ? "发布文章" : "保存为草稿"}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "保存中..." : "保存更改"}
             </Button>
           </CardFooter>
         </form>

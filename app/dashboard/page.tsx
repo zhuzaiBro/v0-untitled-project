@@ -40,6 +40,7 @@ export default function Dashboard() {
 
     const fetchPosts = async () => {
       try {
+        console.log("Fetching posts for user:", user.id)
         const { data, error } = await supabase
           .from("posts")
           .select("*")
@@ -50,8 +51,10 @@ export default function Dashboard() {
           throw error
         }
 
+        console.log("Fetched posts:", data)
         setPosts(data as Post[])
       } catch (error: any) {
+        console.error("Error fetching posts:", error)
         toast({
           title: "获取文章失败",
           description: error.message || "发生了未知错误，请稍后再试",

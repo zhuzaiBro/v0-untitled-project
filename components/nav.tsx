@@ -21,6 +21,9 @@ export function Nav() {
   const { user, signOut } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
 
+  // 添加调试日志
+  console.log("Current user in Nav:", user)
+
   return (
     <header className="border-b">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -51,13 +54,16 @@ export function Nav() {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg?height=32&width=32" alt={user.email || ""} />
-                    <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                    <AvatarImage
+                      src={user.user_metadata?.avatar_url || "/placeholder.svg?height=32&width=32"}
+                      alt={user.email || ""}
+                    />
+                    <AvatarFallback>{user.email ? user.email.charAt(0).toUpperCase() : "U"}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>我的账户</DropdownMenuLabel>
+                <DropdownMenuLabel>{user.email || "用户"}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/dashboard">控制面板</Link>

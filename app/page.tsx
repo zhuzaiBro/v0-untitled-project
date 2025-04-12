@@ -9,11 +9,12 @@ export const revalidate = 60 // 每分钟重新验证页面
 async function getPosts() {
   const supabase = createServerClient()
 
+  // 使用正确的表名 user_profiles 而不是 users
   const { data, error } = await supabase
     .from("posts")
     .select(`
       *,
-      user_profiles(username, display_name, avatar_url)
+      user_profiles(id, username, display_name, avatar_url)
     `)
     .eq("published", true)
     .order("created_at", { ascending: false })
@@ -24,7 +25,11 @@ async function getPosts() {
     return []
   }
 
-  return data as Post[]
+  // 转换数据结构以匹配我们的类型
+  return data.map((post) => ({
+    ...post,
+    author: post.user_profiles,
+  })) as Post[]
 }
 
 export default async function Home() {

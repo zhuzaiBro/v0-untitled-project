@@ -4,17 +4,19 @@ import { createServerClient } from "@/lib/supabase/server"
 import type { Post } from "@/types"
 import { formatDate } from "@/lib/utils"
 import { notFound } from "next/navigation"
+import { CommentsSection } from "@/components/comments-section"
 
 export const revalidate = 60 // 每分钟重新验证页面
 
 async function getPostBySlug(slug: string) {
   const supabase = createServerClient()
 
+  // 使用正确的表名 user_profiles
   const { data, error } = await supabase
     .from("posts")
     .select(`
       *,
-      user_profiles(username, display_name, avatar_url)
+      user_profiles(id, username, display_name, avatar_url)
     `)
     .eq("slug", slug)
     .eq("published", true)
@@ -25,7 +27,11 @@ async function getPostBySlug(slug: string) {
     return null
   }
 
-  return data as Post
+  // 转换数据结构以匹配我们的类型
+  return {
+    ...data,
+    author: data.user_profiles,
+  } as Post
 }
 
 export default async function BlogPost({ params }: { params: { slug: string } }) {
@@ -53,6 +59,8 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         </header>
 
         <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
+
+        <CommentsSection postId={post.id} />
       </article>
     </div>
   )
