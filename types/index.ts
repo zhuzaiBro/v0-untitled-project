@@ -6,6 +6,7 @@ export interface Post {
   excerpt: string | null
   author_id: string
   published: boolean
+  is_public: boolean
   created_at: string
   updated_at: string
   author?: User

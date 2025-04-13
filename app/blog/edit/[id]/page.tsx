@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { RichTextEditor } from "@/components/rich-text-editor"
 import type { Post, Category } from "@/types"
 import { notFound } from "next/navigation"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 export default function EditBlogPost({ params }: { params: { id: string } }) {
   const [post, setPost] = useState<Post | null>(null)
@@ -24,6 +25,7 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
   const [content, setContent] = useState("")
   const [excerpt, setExcerpt] = useState("")
   const [published, setPublished] = useState(false)
+  const [visibility, setVisibility] = useState<"private" | "public">("private")
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
@@ -68,6 +70,7 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
         setContent(postData.content)
         setExcerpt(postData.excerpt || "")
         setPublished(postData.published)
+        setVisibility(postData.is_public ? "public" : "private")
 
         // 获取分类
         const { data: categoriesData, error: categoriesError } = await supabase
@@ -134,6 +137,7 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
           content,
           excerpt: excerpt || null,
           published,
+          is_public: visibility === "public",
         })
         .eq("id", post.id)
 
@@ -281,6 +285,20 @@ export default function EditBlogPost({ params }: { params: { id: string } }) {
                 disabled={isSubmitting}
               />
               <Label htmlFor="published">发布</Label>
+            </div>
+
+            <div className="space-y-2">
+              <Label>可见性</Label>
+              <RadioGroup value={visibility} onValueChange={(value) => setVisibility(value as "private" | "public")}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="private" id="private" />
+                  <Label htmlFor="private">私有 - 仅登录用户可见</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="public" id="public" />
+                  <Label htmlFor="public">公开 - 所有人可见</Label>
+                </div>
+              </RadioGroup>
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">

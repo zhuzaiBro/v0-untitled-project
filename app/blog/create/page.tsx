@@ -16,12 +16,14 @@ import { getSupabaseClient } from "@/lib/supabase/client"
 import { Checkbox } from "@/components/ui/checkbox"
 import { RichTextEditor } from "@/components/rich-text-editor"
 import type { Category } from "@/types"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 export default function CreateBlogPost() {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [excerpt, setExcerpt] = useState("")
   const [published, setPublished] = useState(false)
+  const [visibility, setVisibility] = useState<"private" | "public">("private")
   const [isLoading, setIsLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
@@ -31,8 +33,6 @@ export default function CreateBlogPost() {
   const router = useRouter()
   const { toast } = useToast()
   const supabase = getSupabaseClient()
-
-  useState(null)
 
   React.useEffect(() => {
     const fetchCategories = async () => {
@@ -113,6 +113,7 @@ export default function CreateBlogPost() {
             author_id: user.id,
             published,
             slug,
+            is_public: visibility === "public",
           },
         ])
         .select()
@@ -143,7 +144,7 @@ export default function CreateBlogPost() {
       })
 
       // 重定向到新创建的文章页面或仪表板
-      if (published && data && data[0]) {
+      if (published) {
         router.push(`/blog/${data[0].slug}`)
       } else {
         router.push("/dashboard")
@@ -244,6 +245,20 @@ export default function CreateBlogPost() {
                 disabled={isLoading}
               />
               <Label htmlFor="published">立即发布</Label>
+            </div>
+
+            <div className="space-y-2">
+              <Label>可见性</Label>
+              <RadioGroup value={visibility} onValueChange={(value) => setVisibility(value as "private" | "public")}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="private" id="private" />
+                  <Label htmlFor="private">私有 - 仅登录用户可见</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="public" id="public" />
+                  <Label htmlFor="public">公开 - 所有人可见</Label>
+                </div>
+              </RadioGroup>
             </div>
           </CardContent>
           <CardFooter className="flex justify-between">

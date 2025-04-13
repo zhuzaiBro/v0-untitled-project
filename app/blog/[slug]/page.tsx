@@ -34,10 +34,24 @@ async function getPostBySlug(slug: string) {
   } as Post
 }
 
+async function getCurrentUser() {
+  const supabase = createServerClient()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  return session?.user || null
+}
+
 export default async function BlogPost({ params }: { params: { slug: string } }) {
   const post = await getPostBySlug(params.slug)
+  const currentUser = await getCurrentUser()
 
   if (!post) {
+    notFound()
+  }
+
+  // 如果文章不是公开的，并且用户未登录，则显示 404
+  if (!post.is_public && !currentUser) {
     notFound()
   }
 
@@ -55,6 +69,11 @@ export default async function BlogPost({ params }: { params: { slug: string } })
           <h1 className="text-3xl font-bold mb-4">{post.title}</h1>
           <div className="text-muted-foreground">
             {formatDate(post.created_at)} · {author}
+            {!post.is_public && (
+              <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                私有文章
+              </span>
+            )}
           </div>
         </header>
 

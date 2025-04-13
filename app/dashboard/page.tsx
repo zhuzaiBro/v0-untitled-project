@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast"
 import { getSupabaseClient } from "@/lib/supabase/client"
 import type { Post } from "@/types"
 import { formatDate } from "@/lib/utils"
-import { Edit, Trash2, Eye, EyeOff } from "lucide-react"
+import { Edit, Trash2, Eye, EyeOff, Globe, Lock } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   AlertDialog,
@@ -91,6 +91,29 @@ export default function Dashboard() {
     }
   }
 
+  const toggleVisibilityStatus = async (post: Post) => {
+    try {
+      const { error } = await supabase.from("posts").update({ is_public: !post.is_public }).eq("id", post.id)
+
+      if (error) {
+        throw error
+      }
+
+      setPosts(posts.map((p) => (p.id === post.id ? { ...p, is_public: !p.is_public } : p)))
+
+      toast({
+        title: post.is_public ? "文章已设为私有" : "文章已设为公开",
+        description: post.is_public ? "文章现在只有登录用户可见" : "文章现在所有人可见",
+      })
+    } catch (error: any) {
+      toast({
+        title: "操作失败",
+        description: error.message || "发生了未知错误，请稍后再试",
+        variant: "destructive",
+      })
+    }
+  }
+
   const deletePost = async (postId: string) => {
     try {
       const { error } = await supabase.from("posts").delete().eq("id", postId)
@@ -152,6 +175,7 @@ export default function Dashboard() {
                 <TableRow>
                   <TableHead>标题</TableHead>
                   <TableHead>状态</TableHead>
+                  <TableHead>可见性</TableHead>
                   <TableHead>创建日期</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
@@ -171,6 +195,17 @@ export default function Dashboard() {
                         </span>
                       )}
                     </TableCell>
+                    <TableCell>
+                      {post.is_public ? (
+                        <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                          公开
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                          私有
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>{formatDate(post.created_at)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -181,6 +216,14 @@ export default function Dashboard() {
                           title={post.published ? "设为草稿" : "发布"}
                         >
                           {post.published ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => toggleVisibilityStatus(post)}
+                          title={post.is_public ? "设为私有" : "设为公开"}
+                        >
+                          {post.is_public ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
                         </Button>
                         <Button variant="outline" size="icon" asChild>
                           <Link href={`/blog/edit/${post.id}`}>

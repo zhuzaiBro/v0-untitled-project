@@ -10,6 +10,7 @@ async function getPosts() {
   const supabase = createServerClient()
 
   // 使用正确的表名 user_profiles 而不是 users
+  // 只获取已发布且公开的文章
   const { data, error } = await supabase
     .from("posts")
     .select(`
@@ -17,6 +18,7 @@ async function getPosts() {
       user_profiles(id, username, display_name, avatar_url)
     `)
     .eq("published", true)
+    .eq("is_public", true)
     .order("created_at", { ascending: false })
     .limit(6)
 
@@ -60,7 +62,7 @@ export default async function Home() {
           </div>
         ) : (
           <div className="text-center py-12">
-            <p className="text-muted-foreground mb-4">还没有发布的文章</p>
+            <p className="text-muted-foreground mb-4">还没有发布的公开文章</p>
             <Link href="/blog/create">
               <Button>创建第一篇文章</Button>
             </Link>
