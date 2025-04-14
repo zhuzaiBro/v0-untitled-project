@@ -8,12 +8,6 @@ import Image from "@tiptap/extension-image"
 import Highlight from "@tiptap/extension-highlight"
 import Typography from "@tiptap/extension-typography"
 import Placeholder from "@tiptap/extension-placeholder"
-import { lowlight } from "lowlight/lib/core"
-import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight"
-import css from "highlight.js/lib/languages/css"
-import js from "highlight.js/lib/languages/javascript"
-import ts from "highlight.js/lib/languages/typescript"
-import html from "highlight.js/lib/languages/xml"
 import { Button } from "@/components/ui/button"
 import {
   Bold,
@@ -35,12 +29,6 @@ import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-// 注册语言
-lowlight.registerLanguage("html", html)
-lowlight.registerLanguage("css", css)
-lowlight.registerLanguage("js", js)
-lowlight.registerLanguage("ts", ts)
 
 interface RichTextEditorProps {
   content: string
@@ -67,7 +55,7 @@ export function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        codeBlock: false,
+        codeBlock: true,
       }),
       Heading.configure({
         levels: [1, 2, 3],
@@ -80,9 +68,6 @@ export function RichTextEditor({
       Typography,
       Placeholder.configure({
         placeholder,
-      }),
-      CodeBlockLowlight.configure({
-        lowlight,
       }),
     ],
     content,
