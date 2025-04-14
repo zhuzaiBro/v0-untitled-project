@@ -60,13 +60,19 @@
     "zod": "^3.24.1",
     "@tiptap/pm": "latest",
     "@tiptap/core": "latest",
+    "lowlight": "latest",
+    "highlight.js": "latest",
+    "@tiptap/extension-code-block": "latest",
     "@supabase/supabase-js": "latest",
     "@tiptap/react": "latest",
     "@tiptap/starter-kit": "latest",
     "@tiptap/extension-heading": "latest",
     "@tiptap/extension-link": "latest",
     "@tiptap/extension-image": "latest",
-    "@tiptap/extension-code-block": "latest"
+    "@tiptap/extension-highlight": "latest",
+    "@tiptap/extension-typography": "latest",
+    "@tiptap/extension-placeholder": "latest",
+    "@tiptap/extension-code-block-lowlight": "latest"
   },
   "devDependencies": {
     "@types/node": "^22",

@@ -5,7 +5,15 @@ import StarterKit from "@tiptap/starter-kit"
 import Heading from "@tiptap/extension-heading"
 import Link from "@tiptap/extension-link"
 import Image from "@tiptap/extension-image"
-import CodeBlock from "@tiptap/extension-code-block"
+import Highlight from "@tiptap/extension-highlight"
+import Typography from "@tiptap/extension-typography"
+import Placeholder from "@tiptap/extension-placeholder"
+import { lowlight } from "lowlight/lib/core"
+import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight"
+import css from "highlight.js/lib/languages/css"
+import js from "highlight.js/lib/languages/javascript"
+import ts from "highlight.js/lib/languages/typescript"
+import html from "highlight.js/lib/languages/xml"
 import { Button } from "@/components/ui/button"
 import {
   Bold,
@@ -20,10 +28,19 @@ import {
   ImageIcon,
   Undo,
   Redo,
+  Quote,
+  Highlighter,
 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+// 注册语言
+lowlight.registerLanguage("html", html)
+lowlight.registerLanguage("css", css)
+lowlight.registerLanguage("js", js)
+lowlight.registerLanguage("ts", ts)
 
 interface RichTextEditorProps {
   content: string
@@ -40,10 +57,18 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const [linkUrl, setLinkUrl] = useState("")
   const [imageUrl, setImageUrl] = useState("")
+  const [selectedCodeLanguage, setSelectedCodeLanguage] = useState("js")
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        codeBlock: false,
+      }),
       Heading.configure({
         levels: [1, 2, 3],
       }),
@@ -51,7 +76,14 @@ export function RichTextEditor({
         openOnClick: false,
       }),
       Image,
-      CodeBlock,
+      Highlight,
+      Typography,
+      Placeholder.configure({
+        placeholder,
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
+      }),
     ],
     content,
     editable: !disabled,
@@ -60,14 +92,13 @@ export function RichTextEditor({
     },
     editorProps: {
       attributes: {
-        class: "prose prose-sm sm:prose lg:prose-lg xl:prose-xl focus:outline-none min-h-[200px] max-w-none",
-        placeholder,
+        class: "prose prose-sm sm:prose lg:prose-lg xl:prose-xl focus:outline-none min-h-[200px] max-w-none p-4",
       },
     },
   })
 
-  if (!editor) {
-    return null
+  if (!editor || !isClient) {
+    return <div className="border rounded-md h-[300px] flex items-center justify-center">加载编辑器中...</div>
   }
 
   const addLink = () => {
@@ -86,8 +117,12 @@ export function RichTextEditor({
     }
   }
 
+  const addCodeBlock = () => {
+    editor.chain().focus().toggleCodeBlock({ language: selectedCodeLanguage }).run()
+  }
+
   return (
-    <div className="border rounded-md">
+    <div className="border rounded-md overflow-hidden">
       <div className="flex flex-wrap gap-1 p-2 border-b bg-muted/50">
         <Button
           variant="ghost"
@@ -169,13 +204,59 @@ export function RichTextEditor({
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          onClick={() => editor.chain().focus().toggleBlockquote().run()}
           disabled={disabled}
-          className={editor.isActive("codeBlock") ? "bg-muted" : ""}
+          className={editor.isActive("blockquote") ? "bg-muted" : ""}
           type="button"
         >
-          <Code className="h-4 w-4" />
+          <Quote className="h-4 w-4" />
         </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => editor.chain().focus().toggleHighlight().run()}
+          disabled={disabled}
+          className={editor.isActive("highlight") ? "bg-muted" : ""}
+          type="button"
+        >
+          <Highlighter className="h-4 w-4" />
+        </Button>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={disabled}
+              className={editor.isActive("codeBlock") ? "bg-muted" : ""}
+              type="button"
+            >
+              <Code className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Select value={selectedCodeLanguage} onValueChange={setSelectedCodeLanguage}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="选择语言" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="js">JavaScript</SelectItem>
+                    <SelectItem value="ts">TypeScript</SelectItem>
+                    <SelectItem value="html">HTML</SelectItem>
+                    <SelectItem value="css">CSS</SelectItem>
+                    <SelectItem value="plaintext">Plain Text</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button onClick={addCodeBlock} type="button">
+                  插入代码块
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
 
         <Popover>
           <PopoverTrigger asChild>
@@ -248,9 +329,7 @@ export function RichTextEditor({
         </div>
       </div>
 
-      <div className="p-4">
-        <EditorContent editor={editor} />
-      </div>
+      <EditorContent editor={editor} className="prose-pre:bg-muted prose-pre:p-4 prose-pre:rounded-md" />
     </div>
   )
 }
