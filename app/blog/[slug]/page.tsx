@@ -11,26 +11,31 @@ export const revalidate = 60 // 每分钟重新验证页面
 async function getPostBySlug(slug: string) {
   const supabase = createServerClient()
 
-  // 使用正确的表名 user_profiles
-  const { data, error } = await supabase
-    .from("posts")
-    .select(`
-      *,
-      user_profiles(id, username, display_name, avatar_url)
-    `)
-    .eq("slug", slug)
-    .eq("published", true)
-    .single()
+  // 首先获取文章
+  const { data: post, error } = await supabase.from("posts").select("*").eq("slug", slug).eq("published", true).single()
 
   if (error) {
     console.error("Error fetching post:", error)
     return null
   }
 
-  // 转换数据结构以匹配我们的类型
+  // 获取作者信息
+  const { data: author, error: authorError } = await supabase
+    .from("user_profiles")
+    .select("*")
+    .eq("id", post.author_id)
+    .single()
+
+  if (authorError) {
+    console.error("Error fetching author:", authorError)
+    // 即使获取作者失败，我们仍然返回文章
+    return post as Post
+  }
+
+  // 合并文章和作者信息
   return {
-    ...data,
-    author: data.user_profiles,
+    ...post,
+    author,
   } as Post
 }
 

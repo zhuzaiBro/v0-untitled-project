@@ -24,29 +24,55 @@ async function getCategoryBySlug(slug: string) {
 async function getPostsByCategory(categoryId: string) {
   const supabase = createServerClient()
 
-  const { data, error } = await supabase
+  // 获取分类关联
+  const { data: postRelations, error } = await supabase
     .from("post_categories")
-    .select(`
-      post_id,
-      posts(
-        *,
-        user_profiles(id, username, display_name, avatar_url)
-      )
-    `)
+    .select("post_id")
     .eq("category_id", categoryId)
-    .eq("posts.published", true)
-    .order("posts.created_at", { ascending: false })
 
   if (error) {
-    console.error("Error fetching posts by category:", error)
+    console.error("Error fetching post relations:", error)
     return []
   }
 
-  // 转换数据结构以匹配我们的类型
-  return data.map((item) => ({
-    ...item.posts,
-    author: item.posts.user_profiles,
-  })) as Post[]
+  if (!postRelations || postRelations.length === 0) {
+    return []
+  }
+
+  // 获取文章
+  const postIds = postRelations.map((relation) => relation.post_id)
+  const { data: posts, error: postsError } = await supabase
+    .from("posts")
+    .select("*")
+    .in("id", postIds)
+    .eq("published", true)
+    .eq("is_public", true)
+    .order("created_at", { ascending: false })
+
+  if (postsError) {
+    console.error("Error fetching posts:", postsError)
+    return []
+  }
+
+  // 获取作者信息
+  const authorIds = [...new Set(posts.map((post) => post.author_id))]
+  const { data: profiles, error: profilesError } = await supabase.from("user_profiles").select("*").in("id", authorIds)
+
+  if (profilesError) {
+    console.error("Error fetching user profiles:", profilesError)
+    return posts as Post[]
+  }
+
+  // 合并文章和作者信息
+  const postsWithAuthors = posts.map((post) => {
+    const author = profiles?.find((profile) => profile.id === post.author_id)
+    return {
+      ...post,
+      author: author || null,
+    }
+  })
+
+  return postsWithAuthors as Post[]
 }
 
 export default async function CategoryPage({ params }: { params: { slug: string } }) {
@@ -78,7 +104,7 @@ export default async function CategoryPage({ params }: { params: { slug: string 
         </div>
       ) : (
         <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">该分类下暂无文章</p>
+          <p className="text-muted-foreground mb-4">该分类下暂无公开文章</p>
           <Link href="/blog/create">
             <Button>创建文章</Button>
           </Link>

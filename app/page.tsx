@@ -9,14 +9,10 @@ export const revalidate = 60 // 每分钟重新验证页面
 async function getPosts() {
   const supabase = createServerClient()
 
-  // 使用正确的表名 user_profiles 而不是 users
-  // 只获取已发布且公开的文章
-  const { data, error } = await supabase
+  // 首先获取已发布且公开的文章
+  const { data: posts, error } = await supabase
     .from("posts")
-    .select(`
-      *,
-      user_profiles(id, username, display_name, avatar_url)
-    `)
+    .select("*")
     .eq("published", true)
     .eq("is_public", true)
     .order("created_at", { ascending: false })
@@ -27,11 +23,31 @@ async function getPosts() {
     return []
   }
 
-  // 转换数据结构以匹配我们的类型
-  return data.map((post) => ({
-    ...post,
-    author: post.user_profiles,
-  })) as Post[]
+  // 如果没有文章，直接返回空数组
+  if (!posts || posts.length === 0) {
+    return []
+  }
+
+  // 获取所有作者的用户资料
+  const authorIds = [...new Set(posts.map((post) => post.author_id))]
+  const { data: profiles, error: profilesError } = await supabase.from("user_profiles").select("*").in("id", authorIds)
+
+  if (profilesError) {
+    console.error("Error fetching user profiles:", profilesError)
+    // 即使获取用户资料失败，我们仍然返回文章
+    return posts as Post[]
+  }
+
+  // 将用户资料与文章关联
+  const postsWithAuthors = posts.map((post) => {
+    const author = profiles?.find((profile) => profile.id === post.author_id)
+    return {
+      ...post,
+      author: author || null,
+    }
+  })
+
+  return postsWithAuthors as Post[]
 }
 
 export default async function Home() {
